@@ -23,6 +23,6 @@ public class Network
                 LostItemsPacket.class,
                 LostItemsPacket::toBytes,
                 LostItemsPacket::new,
-                Packets::pocketPackage);
+                LostItemsPacket::handle);
     }
 }

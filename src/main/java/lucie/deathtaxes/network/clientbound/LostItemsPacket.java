@@ -1,5 +1,6 @@
 package lucie.deathtaxes.network.clientbound;
 
+import lucie.deathtaxes.network.Packets;
 import lucie.deathtaxes.toast.LostToast;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.FriendlyByteBuf;
@@ -12,7 +13,7 @@ import java.util.function.Supplier;
 
 public class LostItemsPacket
 {
-    private final List<ItemStack> items;
+    public final List<ItemStack> items;
 
     public LostItemsPacket(List<ItemStack> items)
     {
@@ -45,6 +46,9 @@ public class LostItemsPacket
 
     public void handle(Supplier<NetworkEvent.Context> contextSupplier)
     {
-        contextSupplier.get().enqueueWork(() -> Minecraft.getInstance().getToasts().addToast(new LostToast(this.items)));
+        contextSupplier.get().enqueueWork(() -> {
+            Packets.pocketPackage(this, contextSupplier.get());
+        });
+        contextSupplier.get().setPacketHandled(true);
     }
 }
