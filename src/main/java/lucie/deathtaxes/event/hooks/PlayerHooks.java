@@ -3,6 +3,8 @@ package lucie.deathtaxes.event.hooks;
 import lucie.deathtaxes.DeathTaxes;
 import lucie.deathtaxes.capability.DroppedLootCapability;
 import lucie.deathtaxes.loot.ItemEvaluation;
+import lucie.deathtaxes.network.Network;
+import lucie.deathtaxes.network.clientbound.LostItemsPacket;
 import lucie.deathtaxes.registry.EntityTypeRegistry;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -21,11 +23,13 @@ import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraftforge.network.PacketDistributor;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 public class PlayerHooks
 {
@@ -37,8 +41,7 @@ public class PlayerHooks
         if (!level.getServer().getGameRules().getRule(GameRules.RULE_KEEPINVENTORY).get() && !drops.isEmpty())
         {
             // Collect a list of all loot that is not blacklisted.
-            TagKey<Item> blacklist = ItemTags.create(DeathTaxes.withModNamespace("blacklisted_loot"));
-            List<ItemStack> loot = drops.stream().map(ItemEntity::getItem).filter(itemStack -> !itemStack.is(blacklist)).toList();
+            List<ItemStack> loot = drops.stream().map(ItemEntity::getItem).toList();
 
             // Store valid drops to the player's capability.
             player.getCapability(DroppedLootCapability.DROPPED_LOOT_CAPABILITY).ifPresent(capability -> capability.droppedLoot = loot);
@@ -74,7 +77,19 @@ public class PlayerHooks
     private static void spawn(ServerPlayer player, ServerLevel level, List<ItemStack> contents)
     {
         // Generate merchant offers from the item container.
-        MerchantOffers offers = ItemEvaluation.evaluateItems(player, level, contents);
+        TagKey<Item> blacklist = ItemTags.create(DeathTaxes.withModNamespace("blacklisted_loot"));
+
+        // Accepted items turns into offers.
+        List<ItemStack> accepted = contents.stream()
+                .filter(stack -> !stack.is(blacklist))
+                .toList();
+
+        // Rejected items are displayed.
+        List<ItemStack> rejected = contents.stream()
+                .filter(stack -> stack.is(blacklist))
+                .toList();
+        
+        MerchantOffers offers = ItemEvaluation.evaluateItems(player, level, accepted);
 
         // Spawn Scavenger.
         if (!offers.isEmpty())
@@ -91,6 +106,11 @@ public class PlayerHooks
                 scavenger.merchantOffers = offers;
                 scavenger.restrictTo(target, 16);
             });
+        }
+
+        if (!rejected.isEmpty())
+        {
+            Network.INSTANCE.send(PacketDistributor.PLAYER.with(() -> player), new LostItemsPacket(rejected));
         }
     }
 

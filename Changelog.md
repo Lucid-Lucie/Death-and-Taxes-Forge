@@ -19,3 +19,6 @@
 **1.3.0**
 * Made Scavenger use Behavior instead of Goals.
 * Added more ambiance.
+
+**1.4.0**
+* Added info toast when dying with blacklisted items.

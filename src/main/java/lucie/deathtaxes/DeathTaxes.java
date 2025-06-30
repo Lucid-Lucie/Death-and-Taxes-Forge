@@ -1,9 +1,11 @@
 package lucie.deathtaxes;
 
+import lucie.deathtaxes.network.Network;
 import lucie.deathtaxes.registry.*;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 
 @Mod(DeathTaxes.MODID)
@@ -19,6 +21,12 @@ public class DeathTaxes
         EntityTypeRegistry.ENTITY_TYPES.register(modBus);
         ItemRegistry.ITEMS.register(modBus);
         LootConditionRegistry.LOOT_CONDITIONS.register(modBus);
+        modBus.addListener(this::commonSetup);
+    }
+
+    public void commonSetup(final FMLCommonSetupEvent event)
+    {
+        Network.register();
     }
 
     public static ResourceLocation withModNamespace(String path)
