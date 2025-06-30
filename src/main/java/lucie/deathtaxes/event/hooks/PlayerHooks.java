@@ -7,6 +7,8 @@ import lucie.deathtaxes.network.Network;
 import lucie.deathtaxes.network.clientbound.LostItemsPacket;
 import lucie.deathtaxes.registry.EntityTypeRegistry;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.GlobalPos;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.ItemTags;
@@ -18,11 +20,16 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.MapItem;
+import net.minecraft.world.item.trading.MerchantOffer;
 import net.minecraft.world.item.trading.MerchantOffers;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.saveddata.maps.MapDecoration;
+import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
 import net.minecraftforge.network.PacketDistributor;
 
 import java.util.ArrayList;
@@ -88,25 +95,31 @@ public class PlayerHooks
         List<ItemStack> rejected = contents.stream()
                 .filter(stack -> stack.is(blacklist))
                 .toList();
-        
-        MerchantOffers offers = ItemEvaluation.evaluateItems(player, level, accepted);
 
-        // Spawn Scavenger.
-        if (!offers.isEmpty())
+        // Create a map with the player's death location.
+        BlockPos deathPos = player.getLastDeathLocation().map(GlobalPos::pos).orElse(BlockPos.ZERO);
+        ItemStack deathMap = MapItem.create(level, deathPos.getX(), deathPos.getZ(), (byte) 2, true, true);
+        MapItem.renderBiomePreviewMap(level, deathMap);
+        MapItemSavedData.addTargetDecoration(deathMap, deathPos, "+", MapDecoration.Type.RED_X);
+        deathMap.setHoverName(Component.translatable("item." + DeathTaxes.MODID + ".recovery_map"));
+
+        // Combine all offers.
+        MerchantOffers offers = new MerchantOffers();
+        offers.add(new MerchantOffer(new ItemStack(Items.EMERALD, 5), ItemStack.EMPTY, deathMap, 1, 20, 1.0F));
+        offers.addAll(ItemEvaluation.evaluateItems(player, level, accepted));
+
+        // Use player respawn location as the home position.
+        BlockPos target = player.blockPosition();
+
+        // Find suitable spawnpoint for entity.
+        BlockPos spawnpoint = PlayerHooks.locate(level, target, level.random).orElse(target);
+
+        // Add merchant offers and a home position.
+        Optional.ofNullable(EntityTypeRegistry.SCAVENGER.get().spawn(level, spawnpoint, MobSpawnType.TRIGGERED)).ifPresent(scavenger ->
         {
-            // Use player respawn location as the home position.
-            BlockPos target = player.blockPosition();
-
-            // Find suitable spawnpoint for entity.
-            BlockPos spawnpoint = PlayerHooks.locate(level, target, level.random).orElse(target);
-
-            // Add merchant offers and a home position.
-            Optional.ofNullable(EntityTypeRegistry.SCAVENGER.get().spawn(level, spawnpoint, MobSpawnType.TRIGGERED)).ifPresent(scavenger ->
-            {
-                scavenger.merchantOffers = offers;
-                scavenger.restrictTo(target, 16);
-            });
-        }
+            scavenger.merchantOffers = offers;
+            scavenger.restrictTo(target, 16);
+        });
 
         if (!rejected.isEmpty())
         {

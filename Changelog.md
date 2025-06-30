@@ -22,3 +22,4 @@
 
 **1.4.0**
 * Added info toast when dying with blacklisted items.
+* Scavenger now trades Recovery Maps.
